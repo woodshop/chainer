@@ -18,19 +18,24 @@ if cuda.available:
 
 
 class TestConvolution2D(unittest.TestCase):
+    h = 4
+    w = 3
+    pad = 1
 
-    def setUp(self, use_cudnn=True):
+    def setUp(self):
         self.func = functions.Convolution2D(
-            3, 2, 3, stride=2, pad=1, use_cudnn=use_cudnn)
+            3, 2, 3, stride=2, pad=self.pad, use_cudnn=True)
         self.func.b = numpy.random.uniform(
             -1, 1, self.func.b.shape).astype(numpy.float32)
         self.func.gW.fill(0)
         self.func.gb.fill(0)
 
-        self.x = numpy.random.uniform(-1, 1,
-                                      (2, 3, 4, 3)).astype(numpy.float32)
-        self.gy = numpy.random.uniform(-1, 1,
-                                       (2, 2, 2, 2)).astype(numpy.float32)
+        oh = (self.h + 2 * self.pad - 3) // 2 + 1
+        ow = (self.w + 2 * self.pad - 3) // 2 + 1
+        shape = (2, 3, self.h, self.w)
+        out_shape = (2, 2, oh, ow)
+        self.x = numpy.random.uniform(-1, 1, shape).astype(numpy.float32)
+        self.gy = numpy.random.uniform(-1, 1, out_shape).astype(numpy.float32)
 
     @attr.gpu
     def test_im2col_consistency(self):
@@ -120,6 +125,15 @@ class TestConvolution2D(unittest.TestCase):
     def test_pickling_gpu(self):
         self.func.to_gpu()
         self.check_pickling(cuda.to_gpu(self.x))
+
+
+class TestConvolution2DNegativePad(TestConvolution2D):
+    h = 10
+    w = 8
+    pad = -1
+
+    def setUp(self):
+        super(TestConvolution2DNegativePad, self).setUp()
 
 
 testing.run_module(__name__, __file__)
