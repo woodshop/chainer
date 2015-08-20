@@ -145,3 +145,84 @@ class Linear(function.Function):
                 self.gb += cuda.cumisc.sum(gy[0], 0)
             cuda.culinalg.dot(gy[0], self.W, out=gx)
         return gx.reshape(x[0].shape),
+
+
+class CplxLinear(Linear):
+    def __init__(self, in_size, out_size, wscale=1, bias=0, nobias=False,
+                 initialW=None, initial_bias=None):
+        self.W = None
+        self.gW = None
+        self.b = None
+        self.gb = None
+
+        if initialW is not None:
+            assert initialW.shape == (out_size, in_size)
+            self.W = initialW
+        else:
+            self.W = (numpy.random.normal(
+                0, wscale * math.sqrt(1. / in_size),
+                (out_size, in_size)) + 1j*numpy.random.normal(
+                0, wscale * math.sqrt(1. / in_size),
+                (out_size, in_size))).astype(numpy.complex64)
+            
+        if isinstance(self.W, cuda.GPUArray):
+            self.gW = cuda.empty_like(self.W)
+        else:
+            self.gW = numpy.empty_like(self.W)
+
+        if initial_bias is not None:
+            assert initial_bias.shape == (out_size,)
+            self.b = initial_bias
+        elif not nobias:
+            self.b = numpy.repeat(numpy.complex64(bias), out_size)
+
+        if self.b is not None:
+            if isinstance(self.b, cuda.GPUArray):
+                self.gb = cuda.empty_like(self.b)
+            else:
+                self.gb = numpy.empty_like(self.b)
+
+    def check_type_forward(self, in_types):
+        type_check.expect(in_types.size() == 1)
+        x_type, = in_types
+
+        type_check.expect(
+            x_type.dtype == numpy.complex64,
+            x_type.ndim >= 2,
+            (type_check.Variable(numpy.prod, 'prod')(x_type.shape[1:]) ==
+             type_check.Variable(self.W.shape[1], 'W.shape[1]')),
+        )
+
+    def forward_gpu(self, x):
+        x = _as_mat(x[0])
+        y = cuda.empty((x.shape[0], self.W.shape[0]), dtype=x.dtype)
+        with cuda.using_cumisc():
+            cuda.culinalg.dot(x, self.W, transb='T', out=y)
+        if self.b is not None:
+            cuda.elementwise(
+                '''
+                pycuda::complex<float>* y, 
+                pycuda::complex<float>* b, int n_channel
+                ''',
+                'y[i] += b[i % n_channel]',
+                'linear_bias')(y, self.b, self.b.size)
+        return y,
+
+    def backward_cpu(self, x, gy):
+        _x = _as_mat(x[0])
+        self.gW += (gy[0].T.dot(_x)).conj()
+        if self.gb is not None:
+            self.gb += (gy[0].sum(0)).conj()
+        return gy[0].dot(self.W).reshape(x[0].shape),
+
+    def backward_gpu(self, x, gy):
+        _x = _as_mat(x[0])
+        gx = cuda.empty_like(_x)
+        with cuda.using_cumisc():
+            cuda.culinalg.add_dot(gy[0], _x, self.gW, transa='T')
+            self.gW = cuda.culinalg.conj(self.gW)
+            if self.gb is not None:
+                self.gb += cuda.cumisc.sum(gy[0], 0)
+                self.gb = cuda.culinalg.conj(self.gb)
+            cuda.culinalg.dot(gy[0], self.W, out=gx)
+        return gx.reshape(x[0].shape),

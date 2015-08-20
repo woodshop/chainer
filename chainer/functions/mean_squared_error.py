@@ -51,6 +51,60 @@ class MeanSquaredError(function.Function):
         return gx0, gx1
 
 
+class CplxMeanSquaredError(MeanSquaredError):
+
+    """Mean squared error (a.k.a. Euclidean loss) function."""
+
+    def check_type_forward(self, in_types):
+        type_check.expect(in_types.size() == 2)
+        type_check.expect(
+            in_types[0].dtype == numpy.complex64,
+            in_types[1].dtype == numpy.complex64,
+            in_types[0].shape == in_types[1].shape
+        )
+
+    def forward_cpu(self, inputs):
+        x0, x1 = inputs
+        self.diff = x0 - x1
+        diff = self.diff.ravel()
+        return numpy.array(diff.dot(diff.conj()) / diff.size, numpy.complex64),
+
+    def forward_gpu(self, inputs):
+        x0, x1 = inputs
+        ret = cuda.reduce(
+            '''
+            const pycuda::complex<float>* x0, 
+            const pycuda::complex<float>* x1
+            ''',
+            '(x0[i] - x1[i]) * pycuda::conj((x0[i] - x1[i]))',
+            'a+b', '0', 'mse_fwd', numpy.complex64)(x0, x1)
+        ret /= x0.size
+        return ret,
+
+    def backward_cpu(self, inputs, gy):
+        coeff = 2. * gy[0] / self.diff.size
+        gx0 = coeff * self.diff.conj()
+        return gx0, -gx0
+
+    def backward_gpu(self, inputs, gy):
+        x0, x1 = inputs
+        gx0 = cuda.empty_like(x0)
+        gx1 = cuda.empty_like(x1)
+        coeff = gy[0] * (2. / x0.size)
+        cuda.elementwise(
+            '''
+            pycuda::complex<float>* gx0, 
+            pycuda::complex<float>* gx1, 
+            const pycuda::complex<float>* x0, 
+            const pycuda::complex<float>* x1,
+            const pycuda::complex<float>* coeff
+            ''',
+            '''gx0[i] = *coeff * pycuda::conj((x0[i] - x1[i]));
+               gx1[i] = -gx0[i];''',
+            'mse_bwd')(gx0, gx1, x0, x1, coeff)
+        return gx0, gx1
+
+    
 def mean_squared_error(x0, x1):
     """Mean squared error function.
 
@@ -59,3 +113,12 @@ def mean_squared_error(x0, x1):
 
     """
     return MeanSquaredError()(x0, x1)
+
+def cplx_mean_squared_error(x0, x1):
+    """Mean squared error function.
+
+    This function computes mean squared error between two variables. The mean
+    is taken over the minibatch. Note that the error is not scaled by 1/2.
+
+    """
+    return CplxMeanSquaredError()(x0, x1)
