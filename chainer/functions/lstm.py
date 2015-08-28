@@ -244,13 +244,13 @@ def _grad_georgiou(x, c=1., r=1.):
 _cplx_preamble = '''
 using namespace pycuda;
 
-__device__ complex<float> georgiou(complex<float> x, float a0, float a1) {{ 
+__device__ complex<float> georgiou(complex<float> x, float a0, float a1) {
     return x / (complex<float>(a0) + complex<float>(1)/complex<float>(a1) * 
         abs(x));
-}}
+}
 
 __device__ complex<float> grad_georgiou(complex<float> y, float a0, 
-                                        float a1) {{
+                                        float a1) {
     float re = real(y);
     float im = imag(y);
     float z = abs(y);
@@ -262,19 +262,15 @@ __device__ complex<float> grad_georgiou(complex<float> y, float a0,
     //    0 : - a1*re*im / (z*(a0*a1+z)*(a0*a1+z));
     //float v_y = (z == 0) ? 
     //    1 / a0 : a1*(re*re + a0*a1*z) / (z*(a0*a1+z)*(a0*a1+z));
-    return conj(complex<float>(u_x, u_y));
-}}
+    return complex<float>(u_x, u_y);
+}
 
-__device__ complex<float> grad_tanh(complex<float> y) {{
+__device__ complex<float> grad_tanh(complex<float> y) {
    return complex<float>(1) - y * y;
-
-}}
-
+}
 #define COMMON_ROUTINE \
     int I = i / rsize; \
     int J = i % rsize; \
-    float a0 = {a0}; \
-    float a1 = {a1}; \
     const complex<float>* x_i = x + I * 4 * rsize; \
     complex<float> aa =     tanh(x_i[          J]); \
     complex<float> ai = georgiou(x_i[  rsize + J], a0, a1); \
@@ -292,8 +288,8 @@ class CplxLSTM(function.Function):
     """
 
     def __init__(self, a0=1, a1=1):
-        self.a0 = a0
-        self.a1 = a1
+        self.a0 = float(a0)
+        self.a1 = float(a1)
         super(function.Function, self).__init__()
     
     def check_type_forward(self, in_types):
@@ -347,15 +343,12 @@ class CplxLSTM(function.Function):
         gf[:] = gc_prev * c_prev * _grad_georgiou(self.f)
         go[:] = gh * co * _grad_georgiou(self.o)
         gc_prev *= self.f  # multiply f here
-
         return gc_prev, gx
 
     def forward_gpu(self, inputs):
         c_prev, x = inputs
         lsize = c_prev.shape[0] * c_prev.shape[1]
         rsize = c_prev.size // lsize
-        a0 = cuda.to_gpu(numpy.array(self.a0))
-        a1 = cuda.to_gpu(numpy.array(self.a1))
         self.c = cuda.empty_like(c_prev)
         h = cuda.empty_like(c_prev)
         cuda.elementwise(
@@ -363,16 +356,16 @@ class CplxLSTM(function.Function):
                pycuda::complex<float>* h, 
                const pycuda::complex<float>* c_prev, 
                const pycuda::complex<float>* x,
-               const float* a0,
-               const float* a1,
+               const float a0,
+               const float a1,
                int lsize,
                int rsize''',
             '''COMMON_ROUTINE;
                c[i] = aa * ai + af * c_prev[i];
                h[i] = ao * tanh(c[i]);''',
             'lstm_fwd',
-            preamble=_cplx_preamble.format(a0=self.a0, a1=self.a1)
-        )(self.c, h, c_prev, x, a0, a1, lsize, rsize)
+            preamble=_cplx_preamble
+        )(self.c, h, c_prev, x, self.a0, self.a1, lsize, rsize)
 
         return self.c, h
 
@@ -381,8 +374,6 @@ class CplxLSTM(function.Function):
         gc, gh = grad_outputs
         lsize = c_prev.shape[0] * c_prev.shape[1]
         rsize = c_prev.size // lsize
-        a0 = cuda.to_gpu(numpy.array(self.a0))
-        a1 = cuda.to_gpu(numpy.array(self.a1))
 
         # Odd rule to determine whether the gradient is given or not.
         if gc is None:
@@ -398,8 +389,8 @@ class CplxLSTM(function.Function):
                pycuda::complex<float>* gx, 
                const pycuda::complex<float>* c_prev, 
                const pycuda::complex<float>* x,
-               const float* a0,
-               const float* a1,
+               const float a0,
+               const float a1,
                const pycuda::complex<float>* c, 
                const pycuda::complex<float>* gc,
                const pycuda::complex<float>* gh, 
@@ -429,72 +420,10 @@ class CplxLSTM(function.Function):
                gf         = gc1 * c_prev[i] * grad_georgiou(af, {a0}, {a1});
             '''.format(a0=self.a0, a1=self.a1),
             'lstm_bwd',
-            preamble=_cplx_preamble.format(a0=self.a0, a1=self.a1))(
-                gc_prev, gx, c_prev, x, a0, a1, self.c, gc, gh,
+            preamble=_cplx_preamble)(
+                gc_prev, gx, c_prev, x, self.a0, self.a1, self.c, gc, gh,
                 lsize, rsize)
 
         return gc_prev, gx
 
 
-# def cplx_lstm(c_prev, x):
-#     """Long Short-Term Memory units as an activation function.
-
-#     This function implements LSTM units with forget gates. Let the previous
-#     cell state :math:`c_{\\text{prev}}` and the incoming signal :math:`x`.
-
-#     First, the incoming signal :math:`x` is split into four arrays
-#     :math:`a, i, f, o` of the same shapes along the second axis.
-#     It means that :math:`x` 's second axis must have 4 times the length of
-#     :math:`c_{\\text{prev}}`.
-
-#     The splitted input signals are corresponding to:
-
-#         - :math:`a` : sources of cell input
-#         - :math:`i` : sources of input gate
-#         - :math:`f` : sources of forget gate
-#         - :math:`o` : sources of output gate
-
-#     Second, it computes outputs as:
-
-#     .. math::
-
-#         c &= \\tanh(a) \\text{sigmoid}(i)
-#            + c_{\\text{prev}} \\text{sigmoid}(f), \\\\
-#         h &= \\tanh(c) \\text{sigmoid}(o).
-
-#     These are returned as a tuple of two variables.
-
-#     Args:
-#         c_prev (~chainer.Variable): Variable that holds the previous cell
-#             state. The cell state should be a zero array or the output of the
-#             previous call of LSTM.
-#         x (~chainer.Variable): Variable that holds the incoming signal. It must
-#             have the second dimension four times of that of the cell state,
-
-#     Returns:
-#         tuple: Two :class:`~chainer.Variable` objects ``c`` and ``h``. ``c`` is
-#             the updated cell state. ``h`` indicates the outgoing signal.
-
-#     See the original paper proposing LSTM with forget gates:
-#     `Long Short-Term Memory in Recurrent Neural Networks \
-#     <http://www.felixgers.de/papers/phd.pdf>`_.
-
-#     .. admonition:: Example
-
-#         Assuming ``y`` is the current input signal, ``c`` is the previous cell
-#         state, and ``h`` is the previous output signal from an ``lstm``
-#         function. Each of ``y``, ``c`` and ``h`` has ``n_units`` channels.
-#         Most typical preparation of ``x`` is:
-
-#         >>> model = FunctionSet(w=F.Linear(n_units, 4 * n_units),
-#         ...                     v=F.Linear(n_units, 4 * n_units),
-#         ...                     ...)
-#         >>> x = model.w(y) + model.v(h)
-#         >>> c, h = F.lstm(c, x)
-
-#         It corresponds to calculate the input sources :math:`a, i, f, o` from
-#         the current input ``y`` and the previous output ``h``. Different
-#         parameters are used for different kind of input sources.
-
-#     """
-#     return CplxLSTM()(c_prev, x)
