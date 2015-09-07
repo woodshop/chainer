@@ -34,7 +34,7 @@ class MeanSquaredError(function.Function):
 
     def backward_cpu(self, inputs, gy):
         coeff = 2. * gy[0] / self.diff.size
-        gx0 = coeff * self.diff
+        gx0 = coeff * self.diff.conj()
         return gx0, -gx0
 
     def backward_gpu(self, inputs, gy):
@@ -90,7 +90,7 @@ class CplxMeanSquaredError(MeanSquaredError):
         x0, x1 = inputs
         gx0 = cuda.empty_like(x0)
         gx1 = cuda.empty_like(x1)
-        coeff = gy[0] * (2. / x0.size)
+        coeff = 2 * gy[0] / float(x0.size) 
         cuda.elementwise(
             '''
             pycuda::complex<float>* gx0, 
@@ -99,8 +99,10 @@ class CplxMeanSquaredError(MeanSquaredError):
             const pycuda::complex<float>* x1,
             const pycuda::complex<float>* coeff
             ''',
-            '''gx0[i] = *coeff * pycuda::conj((x0[i] - x1[i]));
-               gx1[i] = -gx0[i];''',
+            '''
+               gx0[i] = *coeff * pycuda::conj((x0[i] - x1[i]));
+               gx1[i] = -gx0[i];
+            ''',
             'mse_bwd')(gx0, gx1, x0, x1, coeff)
         return gx0, gx1
 

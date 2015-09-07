@@ -211,9 +211,9 @@ class CplxLinear(Linear):
 
     def backward_cpu(self, x, gy):
         _x = _as_mat(x[0])
-        self.gW += (gy[0].T.dot(_x)).conj()
+        self.gW += gy[0].T.dot(_x).conj()
         if self.gb is not None:
-            self.gb += (gy[0].sum(0)).conj()
+            self.gb += gy[0].sum(0).conj()
         return gy[0].dot(self.W).reshape(x[0].shape),
 
     def backward_gpu(self, x, gy):

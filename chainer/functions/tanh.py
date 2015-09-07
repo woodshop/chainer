@@ -120,11 +120,13 @@ class CplxTanh(Tanh):
         else:
             cuda.elementwise(
                 '''
-                pycuda::complex<float>* gx, 
-                const pycuda::complex<float>* y, 
-                const pycuda::complex<float>* gy
+                   pycuda::complex<float>* gx,
+                   const pycuda::complex<float>* y,
+                   const pycuda::complex<float>* gy
                 ''',
-                'gx[i] = gy[i] * (pycuda::complex<float>(1) - y[i] * y[i])',
+                '''
+                   gx[i] = gy[i] * (pycuda::complex<float>(1) - y[i] * y[i]);
+                ''',
                 'tanh_bwd')(gx, self.y, gy[0])
         return gx,
 

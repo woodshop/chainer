@@ -233,36 +233,43 @@ def _georgiou(x, c=1., r=1.):
 
 
 def _grad_georgiou(x, c=1., r=1.):
-    x = numpy.real(x)
-    y = numpy.imag(x)
-    z = numpy.abs(z)
-    u_x = r*(y**2 + c*r*z) / (z*(c*r+z)**2)
-    u_y = - r*x*y / (z*(c*r+z)**2)
-    return u_x - 1j*u_y
+    #x = numpy.real(x)
+    #y = numpy.imag(x)
+    #z = numpy.abs(z)
+    #u_x = r*(y**2 + c*r*z) / (z*(c*r+z)**2)
+    #u_y = v_x = - r*x*y / (z*(c*r+z)**2)
+    #v_y = r*(x**2 + c*r*z) / (z*(c*r+z)**2)
+    #return u_x - 1j*u_y
+    df_dz = (2*c*r + numpy.abs(x)) / (2*(c*r+numpy.abs(z))**2)
+    #df_dz_star = -x**2 / (2*numpy.abs(x)*(c*r+numpy.abs(z))**2)
+    return df_dz
 
 
 _cplx_preamble = '''
 using namespace pycuda;
 
-__device__ complex<float> georgiou(complex<float> x, float a0, float a1) {
-    return x / (complex<float>(a0) + complex<float>(1)/complex<float>(a1) * 
+__device__ complex<float> georgiou(complex<float> x, float c, float r) {
+    return x / (complex<float>(c) + complex<float>(1)/complex<float>(r) * 
         abs(x));
 }
 
-__device__ complex<float> grad_georgiou(complex<float> y, float a0, 
-                                        float a1) {
-    float re = real(y);
-    float im = imag(y);
-    float z = abs(y);
-    float u_x = (z == 0) ? 
-        1 / a0 : a1*(im*im + a0*a1*z) / (z*(a0*a1+z)*(a0*a1+z));
-    float u_y = (z == 0) ? 
-        0 : - a1*re*im / (z*(a0*a1+z)*(a0*a1+z));
-    //float v_x = (z == 0) ? 
+__device__ complex<float> grad_georgiou(complex<float> y, float c, 
+                                        float r) {
+    //float re = real(y);
+    //float im = imag(y);
+    //float z = abs(y);
+    //float u_x = (z == 0) ? 
+    //    1 / a0 : a1*(im*im + a0*a1*z) / (z*(a0*a1+z)*(a0*a1+z));
+    //float u_y = (z == 0) ? 
     //    0 : - a1*re*im / (z*(a0*a1+z)*(a0*a1+z));
-    //float v_y = (z == 0) ? 
-    //    1 / a0 : a1*(re*re + a0*a1*z) / (z*(a0*a1+z)*(a0*a1+z));
-    return complex<float>(u_x, u_y);
+    ////float v_x = (z == 0) ? 
+    ////    0 : - a1*re*im / (z*(a0*a1+z)*(a0*a1+z));
+    ////float v_y = (z == 0) ? 
+    ////    1 / a0 : a1*(re*re + a0*a1*z) / (z*(a0*a1+z)*(a0*a1+z));
+    //return complex<float>(u_x, u_y);
+    complex<float> df_dz = (2.*c*r + abs(y)) / (2*(c*r+abs(y))*(c*r+abs(y)));
+    //df_dz_star = -y*y / (2.*abs(y)*(c*r+abs(y))*(c*r+abs(y)));
+    return df_dz;
 }
 
 __device__ complex<float> grad_tanh(complex<float> y) {
