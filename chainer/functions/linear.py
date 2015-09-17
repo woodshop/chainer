@@ -221,8 +221,9 @@ class CplxLinear(Linear):
         gx = cuda.empty_like(_x)
         with cuda.using_cumisc():
             self.gW += cuda.culinalg.conj(
-                cuda.culinalg.dot(gy[0], _x, transa='T'))
+                cuda.culinalg.dot(gy[0], _x, transa='T'), overwrite=True)
             if self.gb is not None:
-                self.gb += cuda.culinalg.conj(cuda.cumisc.sum(gy[0], 0))
+                self.gb += cuda.culinalg.conj(cuda.cumisc.sum(gy[0], 0),
+                                              overwrite=True)
             cuda.culinalg.dot(gy[0], self.W, out=gx)
         return gx.reshape(x[0].shape),

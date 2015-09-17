@@ -53,12 +53,20 @@ class CplxMomentumSGD(MomentumSGD):
         sqnorm = 0
         for _, g, _ in self.tuples:
             sqnorm += _sqnorm(g)
+        #print("Norm of gradient is ", sqnorm)
         return numpy.sqrt(sqnorm)
                     
 def _sqnorm(x):
     if isinstance(x, cuda.GPUArray):
+        ret = cuda.gpuarray.empty((), numpy.complex64)
         with cuda.using_device(x):
-            return numpy.real(cuda.gpuarray.dot(x, x.conj()).get())
+            ret = cuda.reduce(
+                '''
+                const pycuda::complex<float>* x
+                ''',
+                'x[i] * pycuda::conj(x[i])',
+                'a+b', '0', 'sq_norm', numpy.complex64)(x)
+            return ret.real.get()
     x = x.ravel()
     return float(x.dot(x.conj()))
                                     

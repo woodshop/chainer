@@ -9,6 +9,7 @@ from chainer.functions import concat
 from chainer.functions import convolution_2d
 from chainer.functions import copy
 from chainer.functions import cross_covariance
+from chainer.functions import discrim_joint_mse
 from chainer.functions import dropout
 from chainer.functions import embed_id
 from chainer.functions import gaussian
@@ -48,6 +49,7 @@ Concat = concat.Concat
 Copy = copy.Copy
 Cos = basic_math.Cos
 CrossCovariance = cross_covariance.CrossCovariance
+JointMSEMaskingCost = discrim_joint_mse.JointMSEMaskingCost
 Dropout = dropout.Dropout
 CplxDropout = dropout.CplxDropout
 Gaussian = gaussian.Gaussian
