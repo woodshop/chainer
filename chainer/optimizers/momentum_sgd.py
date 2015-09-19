@@ -36,6 +36,13 @@ class MomentumSGD(optimizer.Optimizer):
 
 class CplxMomentumSGD(MomentumSGD):
 
+    def update_one_cpu(self, param, grad, v):
+        assert param.dtype == numpy.complex64
+        assert grad.dtype == numpy.complex64
+        v *= self.momentum
+        v -= self.lr * grad
+        param += v
+
     def update_one_gpu(self, param, grad, v):
         cuda.elementwise(
             '''
@@ -68,5 +75,5 @@ def _sqnorm(x):
                 'a+b', '0', 'sq_norm', numpy.complex64)(x)
             return ret.real.get()
     x = x.ravel()
-    return float(x.dot(x.conj()))
+    return numpy.complex64(x.dot(x.conj()))
                                     

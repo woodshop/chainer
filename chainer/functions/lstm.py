@@ -240,7 +240,7 @@ def _grad_georgiou(x, c=1., r=1.):
     #u_y = v_x = - r*x*y / (z*(c*r+z)**2)
     #v_y = r*(x**2 + c*r*z) / (z*(c*r+z)**2)
     #return u_x - 1j*u_y
-    df_dz = r*(2*c*r + numpy.abs(x)) / (2*(c*r+numpy.abs(z))**2)
+    df_dz = r*(2*c*r + numpy.abs(x)) / (2*(c*r+numpy.abs(x))**2)
     #df_dz_star = -r*x**2 / (2*numpy.abs(x)*(c*r+numpy.abs(z))**2)
     return df_dz
 

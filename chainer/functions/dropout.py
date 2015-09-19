@@ -79,7 +79,7 @@ class CplxDropout(Dropout):
         type_check.expect(in_types[0].dtype == numpy.complex64)
 
     def forward_cpu(self, x):
-        scale = numpy.float64(1. / (1 - self.dropout_ratio))
+        scale = numpy.complex64(1. / (1 - self.dropout_ratio))
         self.mask = scale * \
             (numpy.random.rand(*x[0].shape) >= self.dropout_ratio)
         return x[0] * self.mask,
