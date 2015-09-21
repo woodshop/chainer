@@ -90,7 +90,7 @@ class JointMSEMaskingCost(function.Function):
             diff = diff.ravel()
             return np.array(diff.dot(diff.conj()) / diff.size, dtype)
         ret = (L2(x_hat, x) - gamma*L2(x_hat, y) +
-               L2(y_hat, y) - gamma*L2(y_hat, x))
+               L2(y_hat, y) - gamma*L2(y_hat, x)).squeeze()
         return ret,
 
 
