@@ -189,9 +189,9 @@ class JointMSEMaskingCost(function.Function):
             ''',
             '''
                COMMON_ROUTINE;
-               gx0[i] = *coeff * ((x_hat - x) - *gamma * (x_hat - y) -
-                   (y_hat - y) - *gamma * (y_hat - x) * 
-                   y_hat / (u + v));
+               gx0[i] = *coeff * y_hat / (u + v) * 
+                   ( ((x_hat - x) - *gamma * (x_hat - y)) -
+                     ((y_hat - y) - *gamma * (y_hat - x)) );
                gx1[i] = -gx0[i];
             ''',
             'cost_bwd', preamble=_preamble_real)(gx0, gx1, x0, x1, ndim, gamma,
@@ -218,9 +218,9 @@ class JointMSEMaskingCost(function.Function):
             ''',
             '''
                COMMON_ROUTINE;
-               gx0[i] = *coeff * (conj(x_hat - x) - *gamma * conj(x_hat - y) -
-                   conj(y_hat - y) - *gamma * conj(y_hat - x) * 
-                   y_hat / (u + v));
+               gx0[i] = *coeff * y_hat / (u + v) * 
+                   ( (conj(x_hat - x) - *gamma * conj(x_hat - y)) -
+                     (conj(y_hat - y) - *gamma * conj(y_hat - x)) );
                gx1[i] = -gx0[i];
             ''',
             'cost_bwd', preamble=_preamble_cplx)(gx0, gx1, x0, x1, ndim, gamma,
