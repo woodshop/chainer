@@ -65,7 +65,7 @@ class Absolute(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype == numpy.float32)
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward(self, x):
         return utils.force_array(abs(x[0])),
@@ -197,8 +197,8 @@ class Mul(function.Function):
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 2)
         type_check.expect(
-            in_types[0].dtype == numpy.float32,
-            in_types[1].dtype == numpy.float32,
+            in_types[0].dtype.char.lower() == 'f',
+            in_types[1].dtype.char.lower() == 'f',
             in_types[0].shape == in_types[1].shape
         )
 
@@ -259,8 +259,8 @@ class Div(function.Function):
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 2)
         type_check.expect(
-            in_types[0].dtype == numpy.float32,
-            in_types[1].dtype == numpy.float32,
+            in_types[0].dtype.char.lower() == 'f',
+            in_types[1].dtype.char.lower() == 'f',
             in_types[0].shape == in_types[1].shape
         )
 
@@ -303,7 +303,7 @@ class DivFromConstant(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype == numpy.float32)
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward(self, x):
         value = utils.force_type(x[0].dtype, self.value)
@@ -350,8 +350,8 @@ class PowVarVar(function.Function):
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 2)
         type_check.expect(
-            in_types[0].dtype == numpy.float32,
-            in_types[1].dtype == numpy.float32,
+            in_types[0].dtype.char.lower() == 'f',
+            in_types[1].dtype.char.lower() == 'f',
             in_types[0].shape == in_types[1].shape
         )
 
@@ -393,7 +393,7 @@ class PowVarConst(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype == numpy.float32)
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward(self, x):
         value = utils.force_type(x[0].dtype, self.value)
@@ -443,7 +443,7 @@ class PowConstVar(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype == numpy.float32)
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward_cpu(self, x):
         value = utils.force_type(x[0].dtype, self.value)
@@ -524,7 +524,7 @@ class Exp(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype.kind == 'f')
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward_cpu(self, x):
         self.y = utils.force_array(numpy.exp(x[0]))
@@ -551,7 +551,7 @@ class Log(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype.kind == 'f')
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward_cpu(self, x):
         return utils.force_array(numpy.log(x[0])),
@@ -576,7 +576,7 @@ class Sin(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype.kind == 'f')
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward_cpu(self, x):
         self.y = utils.force_array(numpy.sin(x[0]))
@@ -606,7 +606,7 @@ class Cos(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype.kind == 'f')
+        type_check.expect(in_types[0].dtype.char.lower() == 'f')
 
     def forward_cpu(self, x):
         self.y = utils.force_array(numpy.cos(x[0]))
