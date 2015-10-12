@@ -360,7 +360,19 @@ class PowVarVar(function.Function):
         return self.y,
 
     def forward_gpu(self, x):
-        return x[0] ** x[1],
+        if self.cplx:
+            y = cuda.empty_like(x[0])
+            cuda.elementwise(
+                '''
+                   pycuda::complex<float>* y, 
+                   const pycuda::complex<float>* x0, 
+                   const pycuda::complex<float>* x1
+                ''', '''
+                   y[i] = pow(x0[i], x1[i]);
+                ''', 'pow_var_var_fwd')(y, x[0], x[1])
+            return y,
+        else:
+            return x[0] ** x[1],
 
     def backward_cpu(self, x, gy):
         one = x[1].dtype.type(1)
