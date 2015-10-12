@@ -126,6 +126,7 @@ class Function(object):
             :class:`Variable` objects.
 
         """
+        self.cplx = any(x.data.dtype == numpy.complex64 for x in inputs)
         # First copy itself to avoid duplication within the graph.
         self = copy.copy(self)
 
