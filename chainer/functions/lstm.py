@@ -275,9 +275,9 @@ class CplxLSTM(function.Function):
 
     """
 
-    def __init__(self, a0=1, a1=1):
-        self.a0 = float(a0)
-        self.a1 = float(a1)
+    def __init__(self, c=1, r=1):
+        self.c = float(c)
+        self.r = float(r)
         super(function.Function, self).__init__()
     
     def check_type_forward(self, in_types):
@@ -303,9 +303,9 @@ class CplxLSTM(function.Function):
 
         a, i, f, o = _extract_gates(x)
         self.a = numpy.tanh(a)
-        self.i = _georgiou(i)
-        self.f = _georgiou(f)
-        self.o = _georgiou(o)
+        self.i = _georgiou(i, self.c, self.r)
+        self.f = _georgiou(f, self.c, self.r)
+        self.o = _georgiou(o, self.c, self.r)
 
         self.c = self.a * self.i + self.f * c_prev
         h = self.o * numpy.tanh(self.c)
@@ -338,9 +338,9 @@ class CplxLSTM(function.Function):
         ga[:] = gc_prev * self.i * _grad_tanh(self.a)
         cga[:] = cgc_prev * numpy.conj(self.i) * numpy.conj(_grad_tanh(self.a))
 
-        ggi, cggi = _grad_georgiou(self.i)
-        ggf, cggf = _grad_georgiou(self.f)
-        ggo, cggo = _grad_georgiou(self.o)
+        ggi, cggi = _grad_georgiou(self.i, self.c, self.r)
+        ggf, cggf = _grad_georgiou(self.f, self.c, self.r)
+        ggo, cggo = _grad_georgiou(self.o, self.c, self.r)
 
         gi[:] = (gc_prev * self.a * ggi +
                  cgc_prev * numpy.conj(self.a) * numpy.conj(cggi))
