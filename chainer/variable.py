@@ -68,6 +68,7 @@ class Variable(object):
 
         self.splitter = weakref.ref(lambda: 0)  # dead ref
         self._grad = None
+        self._conj_grad = None
         self.creator = None
 
     def __pos__(self):
@@ -94,6 +95,10 @@ class Variable(object):
     def grad(self):
         return self._grad
 
+    @property
+    def conj_grad(self):
+        return self._conj_grad
+
     @grad.setter
     def grad(self, g):
         error_msg = '''
@@ -116,6 +121,10 @@ https://github.com/pfnet/chainer/issues/new.
                                  % (self.data.shape, g.shape, error_msg))
         self._grad = g
 
+    @conj_grad.setter
+    def conj_grad(self, g):
+        self._conj_grad = g
+        
     def set_creator(self, gen_func):
         """Notifies the variable that the given function is its creator.
 
@@ -167,8 +176,10 @@ https://github.com/pfnet/chainer/issues/new.
             with cuda.using_device(self.data) as user:
                 if user.is_active:
                     self.grad = cuda.ones_like(self.data)
+                    self.conj_grad = cuda.ones_like(self.data)
                 else:
                     self.grad = numpy.ones_like(self.data)
+                    self.conj_grad = numpy.ones_like(self.data)
 
         def add_cand(cand):
             if cand is not None and cand not in seen_set:
@@ -184,16 +195,21 @@ https://github.com/pfnet/chainer/issues/new.
 
             in_data = tuple(x.data for x in func.inputs)
             out_grad = tuple(None if y is None else y.grad for y in outputs)
-            with cuda.using_device(*(in_data + out_grad)):
-                gxs = func.backward(in_data, out_grad)
+            out_conj_grad = tuple(None if y is None else y.conj_grad
+                                  for y in outputs)
+            with cuda.using_device(*(in_data + out_grad + out_conj_grad)):
+                gxs, gcxs = func.backward(in_data, out_grad, out_conj_grad)
             assert len(gxs) == len(in_data)
+            assert len(gcxs) == len(in_data)
 
             if not retain_grad:
                 for y in outputs:
                     if y is not None and y is not self:
                         y.grad = None
-            for x, gx in zip(func.inputs, gxs):
+                        y.conj_grad = None
+            for x, gx, gcx in zip(func.inputs, gxs, gcxs):
                 x.grad = gx
+                x.conj_grad = gcx
                 if gx is not None:  # skip if gradient does not flow
                     add_cand(x.creator)
 

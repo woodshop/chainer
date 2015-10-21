@@ -1,0 +1,15 @@
+#!/bin/bash -l
+#PBS -N product
+#PBS -q default
+#PBS -l nodes=1:ppn=32
+#PBS -A Casey
+#PBS -l walltime=24:00:00
+#PBS -M Andrew.M.Sarroff.GR@dartmouth.edu
+#PBS -m ea
+#PBS -j oe
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=32
+cd $PBS_O_WORKDIR
+python -u /home/asarroff/resources/chainer/examples/product/product.py
+
+exit 0

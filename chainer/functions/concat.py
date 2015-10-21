@@ -64,9 +64,10 @@ class Concat(function.Function):
 
         return y,
 
-    def backward_cpu(self, xs, gy):
+    def backward_cpu(self, xs, gy, cgy):
         sizes = numpy.array([x.shape[self.axis] for x in xs[:-1]]).cumsum()
-        return numpy.split(gy[0], sizes, axis=self.axis)
+        return (numpy.split(gy[0], sizes, axis=self.axis),
+                numpy.split(cgy[0], sizes, axis=self.axis))
 
     def backward_gpu(self, xs, gy):
         gxs = tuple(cuda.empty_like(x) for x in xs)

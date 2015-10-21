@@ -264,7 +264,7 @@ class Function(object):
         """
         raise NotImplementedError()
 
-    def backward(self, inputs, grad_outputs):
+    def backward(self, inputs, grad_outputs, conj_grad_outputs):
         """Applies backprop to output gradient arrays.
 
         It delegates the procedure to :meth:`backward_cpu` or
@@ -288,12 +288,13 @@ class Function(object):
             return value must be a tuple even if it returns only one array.
 
         """
-        if any(isinstance(x, cuda.GPUArray) for x in inputs + grad_outputs):
-            return self.backward_gpu(inputs, grad_outputs)
+        if any(isinstance(x, cuda.GPUArray) for x in inputs + grad_outputs +
+               conj_grad_outputs):
+            return self.backward_gpu(inputs, grad_outputs, conj_grad_outputs)
         else:
-            return self.backward_cpu(inputs, grad_outputs)
+            return self.backward_cpu(inputs, grad_outputs, conj_grad_outputs)
 
-    def backward_cpu(self, inputs, grad_outputs):
+    def backward_cpu(self, inputs, grad_outputs, conj_grad_outputs):
         """Applies backprop to output gradient arrays on CPU.
 
         Args:
@@ -312,9 +313,9 @@ class Function(object):
             return value must be a tuple even if it returns only one array.
 
         """
-        return tuple(None for _ in inputs)
+        return (tuple(None for _ in inputs), tuple(None for _ in inputs))
 
-    def backward_gpu(self, inputs, grad_outputs):
+    def backward_gpu(self, inputs, grad_outputs, conj_grad_inputs):
         """Applies backprop to output gradient arrays on GPU.
 
         Args:
@@ -334,7 +335,7 @@ class Function(object):
             return value must be a tuple even if it returns only one array.
 
         """
-        return tuple(None for _ in inputs)
+        return (tuple(None for _ in inputs), tuple(None for _ in inputs))
 
     def unchain(self):
         """Purges in/out variables and this function itself from the graph.
@@ -443,27 +444,33 @@ class Split(Function):
         self.outputs.append(weakref.ref(output))
         return output
 
-    def backward(self, inputs, grad_outputs):
+    def backward(self, inputs, grad_outputs, conj_grad_outputs):
         # Accumulate gradients
         if len(grad_outputs) == 1:
-            return grad_outputs  # no copy
+            return grad_outputs, conj_grad_outputs  # no copy
 
         gx = None
+        cgx = None
         grad_outputs = [gy for gy in grad_outputs if gy is not None]
+        conj_grad_outputs = [cgy for cgy in conj_grad_outputs
+                             if cgy is not None]
         device_changed = False
         try:
-            for gy in grad_outputs:
+            for gy, cgy in zip(grad_outputs, conj_grad_outputs):
                 if gx is not None:
                     gx += gy
+                    cgx += cgy
                 elif isinstance(gy, cuda.GPUArray):
                     # it affects to above +=, too
                     cuda.use_device(gy, pop=False)
                     device_changed = True
                     gx = cuda.copy_async(gy)
+                    cgx = cuda.copy_async(cgy)
                 else:
                     gx = gy.copy()
+                    cgx = cgy.copy()
         finally:
             if device_changed:
                 cuda.Context.pop()
 
-        return gx,
+        return (gx,), (cgx,)

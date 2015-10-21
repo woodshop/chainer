@@ -6,11 +6,17 @@ class SGD(optimizer.Optimizer):
 
     """Vanilla Stochastic Gradient Descent."""
 
-    def __init__(self, lr=0.01):
+    def __init__(self, lr=0.01, cplx=False):
         self.lr = lr
+        self.cplx = cplx
+        self.dtype = np.complex64 if cplx else np.float32
+    
 
     def update_one_cpu(self, param, grad, _):
-        param -= self.lr * grad
+        if self.cplx:
+            param -= self.lr * np.conj(grad)
+        else:
+            param -= self.lr * grad
 
     def update_one_gpu(self, param, grad, _):
         assert param.dtype == np.float32

@@ -103,8 +103,8 @@ class Add(function.Function):
         y = utils.force_array(x[0] + x[1])
         return y,
 
-    def backward(self, x, gy):
-        return gy[0], gy[0]
+    def backward(self, x, gy, cgy):
+        return (gy[0], gy[0]), (cgy[0], cgy[0])
 
 
 class AddConstant(function.Function):
@@ -238,9 +238,11 @@ class MulConstant(function.Function):
         value = utils.force_type(x[0].dtype, self.value)
         return utils.force_array(value * x[0]),
 
-    def backward(self, x, gy):
+    def backward(self, x, gy, cgy):
         value = utils.force_type(gy[0].dtype, self.value)
-        return utils.force_array(value * gy[0]),
+        gx = utils.force_array(value * gy[0])
+        cgx = utils.force_array(numpy.conj(value) * cgy[0])
+        return (gx,), (cgx,)
 
 
 def mul(lhs, rhs):  # lhs * rhs
