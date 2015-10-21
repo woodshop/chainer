@@ -1,5 +1,6 @@
 #!/ust/bin/env python
 
+from __future__ import print_function 
 from chainer import FunctionSet, Variable, optimizers
 import chainer.functions as F
 import numpy as np
@@ -147,12 +148,14 @@ def run():
     optimizer.setup(model)
     X_val, y_val, mask_val = gen_data()
     y_val_var = Variable(y_val[:, np.newaxis], volatile=True)
-
+    results = []
 
     for epoch in xrange(NUM_EPOCHS):
         model_out = forward(model, X_val, mask_val, volatile=True)
         loss = F.mean_squared_error(model_out, y_val_var, cplx=True)
-        print("{}\t{}".format(epoch, loss.data.real))
+        results.append([epoch, loss.data.real])
+        save_results(results)
+        print("{}\t{}".format(epoch, loss.data.real), file=res_file)
         if loss.data.real < best:
             best = loss.data.real
             save_model(model)
@@ -161,6 +164,8 @@ def run():
             y_var = Variable(y[:, np.newaxis])
             model_out = forward(model, X, mask, volatile=False)
             loss = F.mean_squared_error(model_out, y_var, cplx=True)
+            results.append([epoch, loss.data.real])
+            save_results(results)
             optimizer.zero_grads()
             loss.backward()
             loss.unchain_backward()
@@ -168,15 +173,22 @@ def run():
             optimizer.update()
     model_out = forward(model, X_val, mask_val, volatile=True)
     loss = F.mean_squared_error(model_out, y_val_var, cplx=True)
-    if loss.data.real < best:
+    results.append([epoch, loss.data.real])
+    save_results(results)
+   if loss.data.real < best:
         best = loss.data.real
         save_model(model)
-    print("{}\t{}".format(epoch+1, loss.data.real))
+    print("{}\t{}".format(epoch+1, loss.data.real), file=res_file)
 
 def save_model(model):
     with open('/home/asarroff/tmp/product_model.pkl', 'w') as f:
         cPickle.dump(model.parameters, f, -1)
+        
+def save_results(results):
+    with open('/home/asarroff/tmp/product_results.pkl', 'w') as f:
+        cPickle.dump(results, f, -1)
 
 if __name__ == "__main__":
     lstm = F.CplxLSTM()
+    res_file = open('/home/asarroff/tmp/results.txt', 'w', 1)
     run()
