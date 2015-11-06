@@ -28,7 +28,14 @@ class Tanh(function.Function):
         return self.y,
 
     def forward_gpu(self, x):
+        if self.cplx:
+            ctype = 'pycuda::complex<float>'
+            tanhf = 'pycuda::tanh'
+        else:
+            ctype = 'float'
+            tanhf = 'tanhf'
         self.y = cuda.empty_like(x[0])
+        #import pdb; pdb.set_trace()
         if cudnn.enabled and self.use_cudnn:
             handle = cudnn.get_default_handle()
             desc = cudnn.get_tensor_desc(x[0], 1, 1)
@@ -36,7 +43,8 @@ class Tanh(function.Function):
                 handle, _mode, 1, desc.value, cudnn.get_ptr(x[0]),
                 0, desc.value, cudnn.get_ptr(self.y))
         else:
-            cuda.elementwise('float* y, const float* x', 'y[i] = tanhf(x[i])',
+            cuda.elementwise('{ctype}* y, const {ctype}* x'.format(ctype=ctype), 
+                             'y[i] = {tanhf}(x[i])'.format(tanhf=tanhf),
                              'tanh_fwd')(self.y, x[0])
         return self.y,
 
