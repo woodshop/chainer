@@ -9,12 +9,14 @@ class MeanSquaredError(function.Function):
 
     """Mean squared error (a.k.a. Euclidean loss) function."""
 
-    def __init__(self, cplx=False):
-        self.cplx = cplx
-        if cplx:
-            self.dtype = numpy.complex64
-        else:
-            self.dtype = numpy.float32
+    # def __init__(self):
+    #     self.cplx = cplx
+    #     if cplx:
+    #         self.dtype = numpy.complex64
+    #         self.ctype = 'pycuda::complex<float>'
+    #     else:
+    #         self.dtype = numpy.float32
+    #         self.ctype = 'float'
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 2)
@@ -33,38 +35,57 @@ class MeanSquaredError(function.Function):
     def forward_gpu(self, inputs):
         x0, x1 = inputs
         ret = cuda.reduce(
-            'const float* x0, const float* x1',
-            '(x0[i] - x1[i]) * (x0[i] - x1[i])',
-            'a+b', '0', 'mse_fwd', numpy.float32)(x0, x1)
+            'const {ctype}* x0, const {ctype}* x1'.format(ctype=self.ctype),
+            '(x0[i] - x1[i]) * conj((x0[i] - x1[i]))',
+            'a+b', '0', 'mse_fwd', self.dtype)(x0, x1)
         ret /= x0.size
         return ret,
 
-    def backward_cpu(self, inputs, gy, conj_gy):
+    def backward_cpu(self, inputs, gy, cgy):
         coeff = 2. / self.diff.size
         gx = gy[0] * coeff * self.diff.conj()
-        cgx = conj_gy[0] * coeff * self.diff
+        cgx = cgy[0] * coeff * self.diff
         return (gx, -gx), (cgx, -cgx)
 
-    def backward_gpu(self, inputs, gy):
-        x0, x1 = inputs
-        gx0 = cuda.empty_like(x0)
-        gx1 = cuda.empty_like(x1)
-        coeff = gy[0] * (2. / x0.size)
+    def backward_gpu(self, x, gy, cgy):
+        x0, x1 = x
+        gx  = cuda.empty_like(x0)
+        cgx = cuda.empty_like(x0)
+        coeff = cuda.to_gpu(numpy.asarray(2. / x0.size).astype(self.dtype))
+        #coeff = self.dtype(2. / x0.size)
+
         cuda.elementwise(
-            '''float* gx0, float* gx1, const float* x0, const float* x1,
-               const float* coeff''',
-            '''gx0[i] = *coeff * (x0[i] - x1[i]);
-               gx1[i] = -gx0[i];''',
-            'mse_bwd')(gx0, gx1, x0, x1, coeff)
-        return gx0, gx1
+            '''{ctype}* gx, {ctype}* cgx, const {ctype}* x0, const {ctype}* x1,
+               const {ctype}* gy, const {ctype}* cgy, 
+               const {ctype}* coeff'''.format(ctype=self.ctype),
+            '''gx[i]  = *gy  * (*coeff) * conj(x0[i] - x1[i]);
+               cgx[i] = *cgy * (*coeff) * (x0[i] - x1[i])''',
+            'mse_bwd')(gx, cgx, x0, x1, gy[0], cgy[0], coeff)
+        outputs = (gx, -gx), (cgx, -cgx)
+
+        ### THIS CHECKS OUT
+        # self.diff = cuda.to_cpu(x[0]) - cuda.to_cpu(x[1])
+        # args = [[cuda.to_cpu(i) for i in inputs] for inputs in [x, gy, cgy]]
+        # results = self.backward_cpu(*args)
+        # del self.diff
+        # t = [numpy.allclose(r, cuda.to_cpu(o), equal_nan=True) 
+        #      for result,output in zip(results, outputs) 
+        #      for r,o in zip(*[result, output])]
+        # if not all(t):
+        #     err = numpy.max([numpy.abs(r - cuda.to_cpu(o)) 
+        #            for result,output in zip(results, outputs) 
+        #            for r,o in zip(*[result, output])])
+        #     print("\tWARNING in mse: max abs error: {}".format(err)) 
+        #     # import pdb; pdb.set_trace()
+        return outputs
 
 
-def mean_squared_error(x0, x1, cplx=False):
+def mean_squared_error(x0, x1):
     """Mean squared error function.
 
     This function computes mean squared error between two variables. The mean
     is taken over the minibatch. Note that the error is not scaled by 1/2.
 
     """
-    return MeanSquaredError(cplx=cplx)(x0, x1)
+    return MeanSquaredError()(x0, x1)
 

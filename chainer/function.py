@@ -126,7 +126,6 @@ class Function(object):
             :class:`Variable` objects.
 
         """
-        self.cplx = any(x.data.dtype == numpy.complex64 for x in inputs)
         # First copy itself to avoid duplication within the graph.
         self = copy.copy(self)
 
@@ -188,8 +187,22 @@ class Function(object):
         return self.__class__.__name__
 
     def _check_data_type_forward(self, in_data):
+        if not hasattr(self, 'cplx'):
+            self.assign_type(in_data)
         in_type = type_check.get_types(in_data, 'in_types', False)
         self.check_type_forward(in_type)
+
+    def assign_type(self, in_data):
+        self.dtype = in_data[0].dtype
+        if self.dtype == numpy.complex64:
+            self.cplx = True
+            self.ctype = 'pycuda::complex<float>'
+        elif self.dtype == numpy.float32:
+            self.cplx = False
+            self.ctype = 'float'
+        else:
+            self.cplx = None
+            self.ctype = None
 
     def check_type_forward(self, in_types):
         """Checks types of input data before forward propagation.

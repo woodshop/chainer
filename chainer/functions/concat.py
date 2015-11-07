@@ -4,7 +4,7 @@ from chainer import cuda
 from chainer import function
 from chainer.utils import type_check
 
-_args = 'const float* x, float* y, int cdimx, int cdimy, int rdim, int coffset'
+_args = 'const {ctype}* x, {ctype}* y, int cdimx, int cdimy, int rdim, int coffset'
 _preamble = '''
 #define COPY(statement) \
     int l   = i / (rdim * cdimx);  \
@@ -38,6 +38,8 @@ class Concat(function.Function):
                 if d == self.axis:
                     continue
                 type_check.expect(in_types[0].shape[d] == in_types[i].shape[d])
+        self.cplx = in_types[0].dtype.eval() == numpy.complex64
+
 
     def forward_cpu(self, xs):
         return numpy.concatenate(xs, axis=self.axis),
@@ -56,7 +58,9 @@ class Concat(function.Function):
 
         coffset = 0
         kernel = cuda.elementwise(
-            _args, 'COPY(y[idx] = x[i])', 'concat_fwd', preamble=_preamble)
+            _args.format(ctype=self.ctype), 'COPY(y[idx] = x[i])', 
+            'concat_fwd', 
+            preamble=_preamble)
         for x in xs:
             cdimx = x.shape[self.axis]
             kernel(x, y, cdimx, self.cdimy, self.rdim, coffset)
@@ -69,18 +73,39 @@ class Concat(function.Function):
         return (numpy.split(gy[0], sizes, axis=self.axis),
                 numpy.split(cgy[0], sizes, axis=self.axis))
 
-    def backward_gpu(self, xs, gy):
+    def backward_gpu(self, xs, gy, cgy):
         gxs = tuple(cuda.empty_like(x) for x in xs)
+        cgxs = tuple(cuda.empty_like(x) for x in xs)
 
-        coffset = 0
         kernel = cuda.elementwise(
-            _args, 'COPY(x[i] = y[idx])', 'concat_bwd', preamble=_preamble)
+            _args.format(ctype=self.ctype), 'COPY(x[i] = y[idx])', 
+            'concat_bwd', preamble=_preamble)
+        coffset = 0
         for gx in gxs:
             cdimx = gx.shape[self.axis]
             kernel(gx, gy[0], cdimx, self.cdimy, self.rdim, coffset)
             coffset += cdimx
+        coffset = 0
+        for cgx in cgxs:
+            cdimx = cgx.shape[self.axis]
+            kernel(cgx, cgy[0], cdimx, self.cdimy, self.rdim, coffset)
+            coffset += cdimx
+        outputs = gxs, cgxs
 
-        return gxs
+        ### THIS CHECKS OUT
+        # args = [[cuda.to_cpu(i) for i in inputs] for inputs in [xs, gy, cgy]]
+        # results = self.backward_cpu(*args)
+        # t = [numpy.allclose(r, cuda.to_cpu(o), equal_nan=True) 
+        #      for result,output in zip(results, outputs) 
+        #      for r,o in zip(*[result, output])]
+        # if not all(t):
+        #     err = numpy.max([numpy.abs(r - cuda.to_cpu(o)) 
+        #            for result,output in zip(results, outputs) 
+        #            for r,o in zip(*[result, output])])
+        #     print("\tWARNING in concat: max abs error: {}".format(err)) 
+        #     import pdb; pdb.set_trace()
+
+        return outputs
 
 
 def concat(xs, axis=1):
