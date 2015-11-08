@@ -28,10 +28,17 @@ class SGD(optimizer.Optimizer):
         # gtmp = grad.copy()
         assert param.dtype == self.dtype
         assert grad.dtype == self.dtype
-        cuda.elementwise('{ctype}* param, const {ctype}* grad, float lr'.format(
-            ctype=self.ctype),
-                         'param[i] -= lr * conj(grad[i])',
-                         'sgd')(param, grad, self.lr)
+        if self.cplx:
+            cuda.elementwise('''{ctype}* param, const {ctype}* grad, 
+                                   float lr'''.format(ctype=self.ctype),
+                             'param[i] -= lr * conj(grad[i])',
+                             'sgd')(param, grad, self.lr)
+        else:
+            cuda.elementwise('''{ctype}* param, const {ctype}* grad, 
+                                   float lr'''.format(ctype=self.ctype),
+                             'param[i] -= lr * grad[i]',
+                             'sgd')(param, grad, self.lr)
+
         # t = np.allclose(cuda.to_cpu(ptmp) - self.lr * np.conj(cuda.to_cpu(gtmp)),
         #                 cuda.to_cpu(param))
         # if not t:

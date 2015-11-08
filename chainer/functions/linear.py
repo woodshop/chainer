@@ -166,8 +166,12 @@ class Linear(function.Function):
             if self.gb is not None:
                 self.gb += cuda.cumisc.sum(gy[0], 0)
             cuda.culinalg.dot(gy[0], self.W, out=gx)
-            cuda.culinalg.dot(cgy[0], self.W.conj(), out=cgx)
-        outputs = (gx.reshape(x[0].shape),), (cgx.reshape(x[0].shape),)
+            if self.cplx:
+                cuda.culinalg.dot(cgy[0], self.W.conj(), out=cgx)
+        if self.cplx:
+            outputs = (gx.reshape(x[0].shape),), (cgx.reshape(x[0].shape),)
+        else:
+            outputs = (gx.reshape(x[0].shape),), (None,)
 
         # args = [[cuda.to_cpu(i) for i in inputs] for inputs in [x, gy, cgy]]
         # self.W = cuda.to_cpu(self.W)

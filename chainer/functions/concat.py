@@ -74,22 +74,24 @@ class Concat(function.Function):
                 numpy.split(cgy[0], sizes, axis=self.axis))
 
     def backward_gpu(self, xs, gy, cgy):
-        gxs = tuple(cuda.empty_like(x) for x in xs)
-        cgxs = tuple(cuda.empty_like(x) for x in xs)
-
         kernel = cuda.elementwise(
             _args.format(ctype=self.ctype), 'COPY(x[i] = y[idx])', 
             'concat_bwd', preamble=_preamble)
         coffset = 0
+        gxs = tuple(cuda.empty_like(x) for x in xs)
         for gx in gxs:
             cdimx = gx.shape[self.axis]
             kernel(gx, gy[0], cdimx, self.cdimy, self.rdim, coffset)
             coffset += cdimx
-        coffset = 0
-        for cgx in cgxs:
-            cdimx = cgx.shape[self.axis]
-            kernel(cgx, cgy[0], cdimx, self.cdimy, self.rdim, coffset)
-            coffset += cdimx
+        if self.cplx:
+            cgxs = tuple(cuda.empty_like(x) for x in xs)
+            coffset = 0
+            for cgx in cgxs:
+                cdimx = cgx.shape[self.axis]
+                kernel(cgx, cgy[0], cdimx, self.cdimy, self.rdim, coffset)
+                coffset += cdimx
+        else:
+            cgxs = [None for _ in xs]
         outputs = gxs, cgxs
 
         ### THIS CHECKS OUT

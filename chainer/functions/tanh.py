@@ -31,17 +31,10 @@ class Tanh(function.Function):
         else:
             tanhf = 'tanhf'
         self.y = cuda.empty_like(x[0])
-        if False and cudnn.enabled and self.use_cudnn:
-            handle = cudnn.get_default_handle()
-            desc = cudnn.get_tensor_desc(x[0], 1, 1)
-            libcudnn.cudnnActivationForward(
-                handle, _mode, 1, desc.value, cudnn.get_ptr(x[0]),
-                0, desc.value, cudnn.get_ptr(self.y))
-        else:
-            cuda.elementwise('{ctype}* y, const {ctype}* x'.format(
-                ctype=self.ctype), 
-                             'y[i] = {tanhf}(x[i])'.format(tanhf=tanhf),
-                             'tanh_fwd')(self.y, x[0])
+        cuda.elementwise('{ctype}* y, const {ctype}* x'.format(
+            ctype=self.ctype), 
+                         'y[i] = {tanhf}(x[i])'.format(tanhf=tanhf),
+                         'tanh_fwd')(self.y, x[0])
         return self.y,
 
     def backward_cpu(self, x, gy, cgy):
@@ -51,24 +44,25 @@ class Tanh(function.Function):
 
     def backward_gpu(self, x, gy, cgy):
         gx = cuda.empty_like(self.y)
-        cgx = cuda.empty_like(self.y)
-        if False and cudnn.enabled and self.use_cudnn:
-            handle = cudnn.get_default_handle()
-            desc = cudnn.get_tensor_desc(self.y, 1, 1)
-            libcudnn.cudnnActivationBackward(
-                handle, _mode, 1, desc.value, cudnn.get_ptr(self.y),
-                desc.value, cudnn.get_ptr(
-                    gy[0]), desc.value, cudnn.get_ptr(x[0]),
-                0, desc.value, cudnn.get_ptr(gx))
-        else:
+        if self.cplx:
+            cgx = cuda.empty_like(self.y)
             cuda.elementwise(
                 '''{ctype}* gx, {ctype}* cgx, const {ctype}* y, 
                    const {ctype}* gy, const {ctype}* cgy'''.format(
                     ctype=self.ctype),
-                '''gx[i]  = gy[i]  * (pycuda::complex<float>(1.) - y[i] * y[i]);
-                   cgx[i] = cgy[i] * 
-                      conj(pycuda::complex<float>(1.) - y[i] * y[i])''',
+                '''gx[i]  = gy[i]  * ({ctype}(1.) - y[i] * y[i]);
+                   cgx[i] = cgy[i] * conj({ctype}(1.) - y[i] * y[i])'''.format(
+                       ctype=self.ctype),
                 'tanh_bwd')(gx, cgx, self.y, gy[0], cgy[0])
+        else:
+            cuda.elementwise(
+                '''{ctype}* gx, const {ctype}* y, 
+                   const {ctype}* gy'''.format(
+                    ctype=self.ctype),
+                '''gx[i]  = gy[i]  * (1 - y[i] * y[i])''',
+                'tanh_bwd')(gx, self.y, gy[0])
+            cgx = None
+
         outputs = (gx,), (cgx,)
 
         ### NOT SURE ABOUT THIS (HIGH NUMERICAL ERROR?)
