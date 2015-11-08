@@ -7,12 +7,12 @@ from chainer import cuda
 # TODO(delta2323): Make it public function and move it to common directory.
 
 
-def _sqnorm(x):
+def _sqnorm(x, dtype):
     if isinstance(x, cuda.GPUArray):
         with cuda.using_device(x):
             return float(cuda.gpuarray.dot(x, x).get())
     x = x.ravel()
-    return float(x.dot(x))
+    return dtype(x.dot(x))
 
 
 class Optimizer(object):
@@ -151,8 +151,8 @@ class Optimizer(object):
         # TODO(beam2d): Make it asynchronous to CPU when gradients exist on GPU
         sqnorm = 0
         for _, g, _ in self.tuples:
-            sqnorm += _sqnorm(g)
-        return math.sqrt(sqnorm)
+            sqnorm += _sqnorm(g, self.dtype)
+        return numpy.sqrt(sqnorm)
 
     def clip_grads(self, maxnorm):
         """Clips the norm of whole gradients up to given threshold.

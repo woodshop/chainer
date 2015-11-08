@@ -14,4 +14,3 @@ CplxMomentumSGD = momentum_sgd.CplxMomentumSGD
 RMSprop = rmsprop.RMSprop
 RMSpropGraves = rmsprop_graves.RMSpropGraves
 SGD = sgd.SGD
-CplxSGD = sgd.CplxSGD

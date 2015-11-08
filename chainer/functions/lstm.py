@@ -234,8 +234,8 @@ def _georgiou(x, c=1., r=1.):
 
 def _grad_georgiou(x, c=1., r=1.):
     df_dz = r*(2*c*r + numpy.abs(x)) / (2*(c*r+numpy.abs(x))**2)
-    #df_dz_star = -r*x**2 / (2*numpy.abs(x)*(c*r+numpy.abs(z))**2)
-    return df_dz
+    df_dz_star = -r*x**2 / (2*numpy.abs(x)*(c*r+numpy.abs(x))**2)
+    return df_dz, df_dz_star
 
 
 _cplx_preamble = '''
@@ -275,9 +275,9 @@ class CplxLSTM(function.Function):
 
     """
 
-    def __init__(self, a0=1, a1=1):
-        self.a0 = float(a0)
-        self.a1 = float(a1)
+    def __init__(self, c=1, r=1):
+        self.c = float(c)
+        self.r = float(r)
         super(function.Function, self).__init__()
     
     def check_type_forward(self, in_types):
@@ -303,35 +303,60 @@ class CplxLSTM(function.Function):
 
         a, i, f, o = _extract_gates(x)
         self.a = numpy.tanh(a)
-        self.i = _georgiou(i)
-        self.f = _georgiou(f)
-        self.o = _georgiou(o)
+        self.i = _georgiou(i, self.c, self.r)
+        self.f = _georgiou(f, self.c, self.r)
+        self.o = _georgiou(o, self.c, self.r)
 
         self.c = self.a * self.i + self.f * c_prev
         h = self.o * numpy.tanh(self.c)
         return self.c, h
 
-    def backward_cpu(self, inputs, grad_outputs):
+    def backward_cpu(self, inputs, gy, cgy):
         c_prev = inputs[0]
-        gc, gh = grad_outputs
+        gc, gh = gy
+        cgc, cgh = cgy
 
         gx = numpy.empty_like(inputs[1])
         ga, gi, gf, go = _extract_gates(gx)
+        cgx = numpy.empty_like(inputs[1])
+        cga, cgi, cgf, cgo = _extract_gates(cgx)
 
         # Consider the case that either gradient is not given
         if gc is None:
             gc = 0
         if gh is None:
             gh = 0
+        if cgc is None:
+            cgc = 0
+        if cgh is None:
+            cgh = 0
 
         co = numpy.tanh(self.c)
         gc_prev = gh * self.o * _grad_tanh(co) + gc  # multiply f later
+        cgc_prev = cgh * numpy.conj(self.o) * numpy.conj(_grad_tanh(co)) + cgc
+        
         ga[:] = gc_prev * self.i * _grad_tanh(self.a)
-        gi[:] = gc_prev * self.a * _grad_georgiou(self.i)
-        gf[:] = gc_prev * c_prev * _grad_georgiou(self.f)
-        go[:] = gh * co * _grad_georgiou(self.o)
+        cga[:] = cgc_prev * numpy.conj(self.i) * numpy.conj(_grad_tanh(self.a))
+
+        ggi, cggi = _grad_georgiou(self.i, self.c, self.r)
+        ggf, cggf = _grad_georgiou(self.f, self.c, self.r)
+        ggo, cggo = _grad_georgiou(self.o, self.c, self.r)
+
+        gi[:] = (gc_prev * self.a * ggi +
+                 cgc_prev * numpy.conj(self.a) * numpy.conj(cggi))
+        cgi[:] = (gc_prev * self.a * cggi +
+                  cgc_prev * numpy.conj(self.a) * numpy.conj(ggi))
+        gf[:] = (gc_prev * c_prev * ggf +
+                 cgc_prev * numpy.conj(c_prev) * numpy.conj(cggf))
+        cgf[:] = (gc_prev * c_prev * cggf +
+                  cgc_prev * numpy.conj(c_prev) * numpy.conj(ggf))
+        go[:] = (gh * co * ggo +
+                 cgh * numpy.conj(co) * numpy.conj(cggo))
+        cgo[:] = (gh * co * cggo +
+                  cgh * numpy.conj(co) * numpy.conj(ggo))
         gc_prev *= self.f  # multiply f here
-        return gc_prev, gx
+        cgc_prev *= numpy.conj(self.f)  # multiply f here
+        return (gc_prev, gx), (cgc_prev, cgx)
 
     def forward_gpu(self, inputs):
         c_prev, x = inputs
