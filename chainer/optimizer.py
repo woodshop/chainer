@@ -10,7 +10,7 @@ from chainer import cuda
 def _sqnorm(x, dtype):
     if isinstance(x, cuda.GPUArray):
         with cuda.using_device(x):
-            return float(cuda.gpuarray.dot(x, x).get())
+            return dtype(cuda.gpuarray.dot(x, x).get())
     x = x.ravel()
     return dtype(x.dot(x))
 

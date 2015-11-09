@@ -8,9 +8,16 @@ class MomentumSGD(optimizer.Optimizer):
 
     """Classical momentum SGD."""
 
-    def __init__(self, lr=0.01, momentum=0.9):
+    def __init__(self, lr=0.01, momentum=0.9, cplx=False):
         self.lr = lr
         self.momentum = momentum
+        self.cplx = cplx
+        if cplx:
+            self.dtype = numpy.complex64
+            self.ctype = 'pycuda::complex<float>'
+        else:
+            self.dtype = numpy.float32
+            self.ctype = 'float'
 
     def init_state_cpu(self, param, grad):
         return numpy.zeros_like(param)
@@ -19,61 +26,24 @@ class MomentumSGD(optimizer.Optimizer):
         return cuda.zeros_like(param)
 
     def update_one_cpu(self, param, grad, v):
-        assert param.dtype == numpy.float32
-        assert grad.dtype == numpy.float32
+        assert param.dtype == self.dtype
+        assert grad.dtype == self.dtype
         v *= self.momentum
         v -= self.lr * grad
         param += v
 
     def update_one_gpu(self, param, grad, v):
-        cuda.elementwise(
-            '''float* param, const float* grad, float* v,
-               float lr, float momentum''',
-            '''v[i] = momentum * v[i] - lr * grad[i];
-               param[i] += v[i];''',
-            'momentum_sgd')(param, grad, v, self.lr, self.momentum)
-
-
-class CplxMomentumSGD(MomentumSGD):
-
-    def update_one_cpu(self, param, grad, v):
-        assert param.dtype == numpy.complex64
-        assert grad.dtype == numpy.complex64
-        v *= self.momentum
-        v -= self.lr * grad
-        param += v
-
-    def update_one_gpu(self, param, grad, v):
-        cuda.elementwise(
-            '''
-               pycuda::complex<float>* param, 
-               const pycuda::complex<float>* grad, 
-               pycuda::complex<float>* v,
-               float lr, 
-               float momentum
-            ''',
-            '''v[i] = momentum * v[i] - lr * grad[i];
-               param[i] += v[i];''',
-            'momentum_sgd')(param, grad, v, self.lr, self.momentum)
-
-    def compute_grads_norm(self):
-        sqnorm = 0
-        for _, g, _ in self.tuples:
-            sqnorm += _sqnorm(g)
-        #print("Norm of gradient is ", sqnorm)
-        return numpy.sqrt(sqnorm)
-                    
-def _sqnorm(x):
-    if isinstance(x, cuda.GPUArray):
-        ret = cuda.gpuarray.empty((), numpy.complex64)
-        with cuda.using_device(x):
-            ret = cuda.reduce(
-                '''
-                const pycuda::complex<float>* x
-                ''',
-                'x[i] * pycuda::conj(x[i])',
-                'a+b', '0', 'sq_norm', numpy.complex64)(x)
-            return ret.real.get()
-    x = x.ravel()
-    return numpy.complex64(x.dot(x.conj()))
-                                    
+        if self.cplx:
+            cuda.elementwise(
+                '''{ctype}* param, const {ctype}* grad, {ctype}* v,
+                   float lr, float momentum'''.format(ctype=self.ctype),
+                '''v[i] = momentum * v[i] - lr * conj(grad[i]);
+                   param[i] += v[i];''',
+                'momentum_sgd')(param, grad, v, self.lr, self.momentum)
+        else:
+            cuda.elementwise(
+                '''{ctype}* param, const {ctype}* grad, {ctype}* v,
+                   float lr, float momentum'''.format(ctype=self.ctype),
+                '''v[i] = momentum * v[i] - lr * grad[i];
+                   param[i] += v[i];''',
+                'momentum_sgd')(param, grad, v, self.lr, self.momentum)
