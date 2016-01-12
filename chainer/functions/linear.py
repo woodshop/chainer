@@ -151,7 +151,10 @@ class Linear(function.Function):
         if self.gb is not None:
             self.gb += gy[0].sum(0)
         gx = gy[0].dot(self.W).reshape(x[0].shape)
-        cgx = cgy[0].dot(numpy.conj(self.W)).reshape(x[0].shape)
+        if self.cplx:
+            cgx = cgy[0].dot(numpy.conj(self.W)).reshape(x[0].shape)
+        else:
+            cgx = None
         return (gx,), (cgx,)
 
     def backward_gpu(self, x, gy, cgy):
@@ -162,9 +165,14 @@ class Linear(function.Function):
         cgx = cuda.empty_like(_x)
         with cuda.using_cumisc():
             cuda.culinalg.add_dot(gy[0], _x, self.gW, transa='T')
-            #self.gW = cuda.culinalg.dot(gy[0], _x, transa='T')
+            # The following form is equivalent. However if this line
+            # (and the respective line in the bias update)
+            # is used, then the update_one method of the optimizer should 
+            # be set to use a non-conjugate update:
+            # cuda.culinalg.add_dot(cgy[0], _x.conj(), self.gW, transa='T')
             if self.gb is not None:
                 self.gb += cuda.cumisc.sum(gy[0], 0)
+                # self.gb += cuda.cumisc.sum(cgy[0], 0)
             cuda.culinalg.dot(gy[0], self.W, out=gx)
             if self.cplx:
                 cuda.culinalg.dot(cgy[0], self.W.conj(), out=cgx)

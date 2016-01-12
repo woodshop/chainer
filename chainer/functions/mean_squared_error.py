@@ -55,8 +55,10 @@ class MeanSquaredError(function.Function):
 
     def backward_gpu(self, x, gy, cgy):
         x0, x1 = x
-        gx  = cuda.empty_like(x0) 
-        coeff = cuda.to_gpu(numpy.asarray(2. / x0.size).astype(self.dtype))
+        gx  = cuda.empty_like(x0)
+        ### REALLY not sure if the gardient should be scaled by 2 here.
+        # coeff = cuda.to_gpu(numpy.asarray(2. / x0.size).astype(self.dtype))
+        coeff = cuda.to_gpu(numpy.asarray(1. / x0.size).astype(self.dtype))
         if self.cplx:
             cgx = cuda.empty_like(x0)
             cuda.elementwise(
@@ -84,6 +86,7 @@ class MeanSquaredError(function.Function):
             #     # import pdb; pdb.set_trace()
             return outputs
         else:
+            coeff *= 2
             cuda.elementwise(
                 '''{ctype}* gx, const {ctype}* x0, 
                    const {ctype}* x1, const {ctype}* gy, 

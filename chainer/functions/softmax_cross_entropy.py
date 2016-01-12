@@ -65,7 +65,7 @@ class SoftmaxCrossEntropy(function.Function):
         ret /= count
         return ret,
 
-    def backward_cpu(self, inputs, grad_outputs):
+    def backward_cpu(self, inputs, grad_outputs, cgy):
         t, gloss = inputs[1], grad_outputs[0]
         n_unit = int(numpy.prod(self.y.shape[2:]))
         if self.y.ndim == 2:
@@ -86,9 +86,9 @@ class SoftmaxCrossEntropy(function.Function):
         else:
             count = t.shape[0]
         gx *= gloss / count
-        return gx, None
+        return (gx, None), (None, None)
 
-    def backward_gpu(self, inputs, grad_outputs):
+    def backward_gpu(self, inputs, grad_outputs, cgy):
         t, gloss = inputs[1], grad_outputs[0]
         n_unit = int(numpy.prod(self.y.shape[2:]))
         gx = cuda.empty_like(self.y)
@@ -110,7 +110,7 @@ class SoftmaxCrossEntropy(function.Function):
             ''',
             'softmax_crossent_bwd')(
                 gx, self.y, t, coeff, self.y.shape[1], n_unit)
-        return gx, None
+        return (gx, None), (None, None)
 
 
 def softmax_cross_entropy(x, t, use_cudnn=True, normalize=True):

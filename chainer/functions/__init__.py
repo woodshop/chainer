@@ -39,6 +39,7 @@ from chainer.functions import softplus
 from chainer.functions import split_axis
 from chainer.functions import sum as sum_
 from chainer.functions import tanh
+from chainer.functions import georgiou
 
 NonparameterizedConvolution2D = \
     nonparameterized_convolution_2d.NonparameterizedConvolution2D
@@ -69,7 +70,7 @@ Sin = basic_math.Sin
 Softmax = softmax.Softmax
 Softplus = softplus.Softplus
 Tanh = tanh.Tanh
-#CplxTanh = tanh.CplxTanh
+Georgiou = georgiou.Georgiou
 AveragePooling2D = pooling_2d.AveragePooling2D
 MaxPooling2D = pooling_2d.MaxPooling2D
 SpatialPyramidPooling2D = pooling_2d.SpatialPyramidPooling2D
@@ -123,8 +124,8 @@ sigmoid = sigmoid.sigmoid
 sin = basic_math.sin
 softmax = softmax.softmax
 softplus = softplus.softplus
-#cplx_tanh = tanh.cplx_tanh
 tanh = tanh.tanh
+georgiou = georgiou.georgiou
 
 average_pooling_2d = pooling_2d.average_pooling_2d
 max_pooling_2d = pooling_2d.max_pooling_2d

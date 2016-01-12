@@ -29,7 +29,10 @@ class MomentumSGD(optimizer.Optimizer):
         assert param.dtype == self.dtype
         assert grad.dtype == self.dtype
         v *= self.momentum
-        v -= self.lr * grad
+        if self.cplx:
+            v -= self.lr * grad.conj()
+        else:
+            v -= self.lr * grad
         param += v
 
     def update_one_gpu(self, param, grad, v):
@@ -40,6 +43,13 @@ class MomentumSGD(optimizer.Optimizer):
                 '''v[i] = momentum * v[i] - lr * conj(grad[i]);
                    param[i] += v[i];''',
                 'momentum_sgd')(param, grad, v, self.lr, self.momentum)
+            # Use this form if teh conjugate gradient is used (see linear)
+            # cuda.elementwise(
+            #     '''{ctype}* param, const {ctype}* grad, {ctype}* v,
+            #        float lr, float momentum'''.format(ctype=self.ctype),
+            #     '''v[i] = momentum * v[i] - lr * grad[i];
+            #        param[i] += v[i];''',
+            #     'momentum_sgd')(param, grad, v, self.lr, self.momentum)
         else:
             cuda.elementwise(
                 '''{ctype}* param, const {ctype}* grad, {ctype}* v,
