@@ -39,7 +39,10 @@ class Tanh(function.Function):
 
     def backward_cpu(self, x, gy, cgy):
         gx = gy[0] * (1 - self.y * self.y)
-        cgx = cgy[0] * numpy.conj(1 - self.y * self.y)
+        if self.cplx:
+            cgx = cgy[0] * numpy.conj(1 - self.y * self.y)
+        else:
+            cgx = None
         return (gx,), (cgx,)
 
     def backward_gpu(self, x, gy, cgy):
