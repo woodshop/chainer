@@ -26,8 +26,10 @@ class MomentumSGD(optimizer.Optimizer):
         return cuda.zeros_like(param)
 
     def update_one_cpu(self, param, grad, v):
-        assert param.dtype == self.dtype
-        assert grad.dtype == self.dtype
+        # Temporarily commented out to allow optimizing
+        # mixed complex-real nets
+        #assert param.dtype == self.dtype
+        #assert grad.dtype == self.dtype
         v *= self.momentum
         if self.cplx:
             v -= self.lr * grad.conj()

@@ -57,8 +57,7 @@ class MeanSquaredError(function.Function):
         x0, x1 = x
         gx  = cuda.empty_like(x0)
         ### REALLY not sure if the gardient should be scaled by 2 here.
-        # coeff = cuda.to_gpu(numpy.asarray(2. / x0.size).astype(self.dtype))
-        coeff = cuda.to_gpu(numpy.asarray(1. / x0.size).astype(self.dtype))
+        coeff = cuda.to_gpu(numpy.asarray(2. / x0.size).astype(self.dtype))
         if self.cplx:
             cgx = cuda.empty_like(x0)
             cuda.elementwise(
