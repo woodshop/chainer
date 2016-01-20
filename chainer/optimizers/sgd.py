@@ -30,7 +30,7 @@ class SGD(optimizer.Optimizer):
         assert grad.dtype == self.dtype
         if self.cplx:
             cuda.elementwise('''{ctype}* param, const {ctype}* grad, 
-                                   float lr'''.format(ctype=self.ctype),
+                                   {ctype} lr'''.format(ctype=self.ctype),
                              'param[i] -= lr * conj(grad[i])',
                              'sgd')(param, grad, self.lr)
         else:
