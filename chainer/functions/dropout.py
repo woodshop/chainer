@@ -46,9 +46,12 @@ class Dropout(function.Function):
 
     def backward_gpu(self, x, gy, cgy):
         gx = cuda.empty_like(gy[0])
-        cgx = cuda.empty_like(cgy[0])
         self.kernel(gx, gy[0], self.rand, numpy.float32(self.dropout_ratio), self.scale)
-        self.kernel(cgx, cgy[0], self.rand, numpy.float32(self.dropout_ratio), self.scale)
+        if self.cplx:
+            cgx = cuda.empty_like(cgy[0])
+            self.kernel(cgx, cgy[0], self.rand, numpy.float32(self.dropout_ratio), self.scale)
+        else:
+            cgx = None
         return (gx,), (cgx,)
 
 

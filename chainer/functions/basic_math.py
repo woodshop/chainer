@@ -573,8 +573,13 @@ class Log(function.Function):
     def forward_gpu(self, x):
         return cuda.cumath.log(x[0]),
 
-    def backward(self, x, gy):
-        return utils.force_array(gy[0] / x[0]),
+    def backward(self, x, gy, cgy):
+        gx = utils.force_array(gy[0] / x[0])
+        if self.cplx:
+            cgx = utils.force_array(gy[0] / x[0].conj())
+        else:
+            cgx = None
+        return (gx,), (cgx,)
 
 
 def log(x):
@@ -600,11 +605,21 @@ class Sin(function.Function):
         y = cuda.cumath.sin(x[0])
         return y,
 
-    def backward_cpu(self, x, gy):
-        return utils.force_array(numpy.cos(x[0]) * gy[0]),
+    def backward_cpu(self, x, gy, cgy):
+        gx = utils.force_array(numpy.cos(x[0]) * gy[0])
+        if self.cplx:
+            cgx = utils.force_array(numpy.conj(numpy.cos(x[0])) * cgy[0])
+        else:
+            cgx = None
+        return (gx,), (cgx,)
 
-    def backward_gpu(self, x, gy):
-        return utils.force_array(cuda.cumath.cos(x[0]) * gy[0]),
+    def backward_gpu(self, x, gy, cgy):
+        gx = utils.force_array(cuda.cumath.cos(x[0]) * gy[0])
+        if self.cplx:
+            cgx = utils.force_array(cuda.cumath.cos(x[0]).conj() * cgy[0])
+        else:
+            cgx = None
+        return (gx,), (cgx,)
 
 
 def sin(x):
@@ -630,10 +645,10 @@ class Cos(function.Function):
         y = cuda.cumath.cos(x[0])
         return y,
 
-    def backward_cpu(self, x, gy):
+    def backward_cpu(self, x, gy, cgy):
         return utils.force_array(-numpy.sin(x[0]) * gy[0]),
 
-    def backward_gpu(self, x, gy):
+    def backward_gpu(self, x, gy, cgy):
         return utils.force_array(-cuda.cumath.sin(x[0]) * gy[0]),
 
 

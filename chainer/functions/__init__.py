@@ -38,7 +38,14 @@ from chainer.functions import softmax_cross_entropy
 from chainer.functions import softplus
 from chainer.functions import split_axis
 from chainer.functions import sum as sum_
+from chainer.functions import tan
 from chainer.functions import tanh
+from chainer.functions import arctan
+from chainer.functions import arctanh
+from chainer.functions import sinh
+from chainer.functions import arcsin
+from chainer.functions import arcsinh
+from chainer.functions import arccos
 from chainer.functions import georgiou
 
 NonparameterizedConvolution2D = \
@@ -69,7 +76,14 @@ Sigmoid = sigmoid.Sigmoid
 Sin = basic_math.Sin
 Softmax = softmax.Softmax
 Softplus = softplus.Softplus
+Tan = tan.Tan
 Tanh = tanh.Tanh
+Arctan = arctan.Arctan
+Arctanh = arctanh.Arctanh
+Sinh = sinh.Sinh
+Arcsin = arcsin.Arcsin
+Arcsinh = arcsinh.Arcsinh
+Arccos = arccos.Arccos
 Georgiou = georgiou.Georgiou
 AveragePooling2D = pooling_2d.AveragePooling2D
 MaxPooling2D = pooling_2d.MaxPooling2D
@@ -124,7 +138,14 @@ sigmoid = sigmoid.sigmoid
 sin = basic_math.sin
 softmax = softmax.softmax
 softplus = softplus.softplus
+tan = tan.tan
 tanh = tanh.tanh
+arctan = arctan.arctan
+arctanh = arctanh.arctanh
+sinh = sinh.sinh
+arcsin = arcsin.arcsin
+arcsinh = arcsinh.arcsinh
+arccos = arccos.arccos
 georgiou = georgiou.georgiou
 
 average_pooling_2d = pooling_2d.average_pooling_2d
