@@ -70,14 +70,15 @@ class Linear(function.Function):
             assert initialW.shape == (out_size, in_size)
             self.W = initialW
         else:
-            self.W = numpy.random.normal(
+             self.W = numpy.random.normal(
                 0, wscale * math.sqrt(1. / in_size),
                 (out_size, in_size)).astype(numpy.float32)
-            if cplx:
-                self.W = self.dtype(
-                    self.W + 1j * 
-                    numpy.random.normal(0, wscale * math.sqrt(1. / in_size), 
-                                        (out_size, in_size)))
+             if cplx:
+                 self.W = self.dtype(
+                     self.W + 1j * 
+                     numpy.random.normal(0, wscale * math.sqrt(1. / in_size), 
+                                         (out_size, in_size)))
+
         if isinstance(self.W, cuda.GPUArray):
             self.gW = cuda.empty_like(self.W)
         else:
