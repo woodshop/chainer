@@ -8,16 +8,10 @@ class MomentumSGD(optimizer.Optimizer):
 
     """Classical momentum SGD."""
 
-    def __init__(self, lr=0.01, momentum=0.9, cplx=False):
+    def __init__(self, lr=0.01, momentum=0.9, debug=False):
+        self.debug = debug
         self.lr = lr
         self.momentum = momentum
-        self.cplx = cplx
-        if cplx:
-            self.dtype = numpy.complex64
-            self.ctype = 'pycuda::complex<float>'
-        else:
-            self.dtype = numpy.float32
-            self.ctype = 'float'
 
     def init_state_cpu(self, param, grad):
         return numpy.zeros_like(param)
@@ -30,22 +24,26 @@ class MomentumSGD(optimizer.Optimizer):
         # mixed complex-real nets
         #assert param.dtype == self.dtype
         #assert grad.dtype == self.dtype
+        cplx = grad.dtype == numpy.complex64
         v *= self.momentum
-        if self.cplx:
+        if cplx:
             v -= self.lr * grad.conj()
         else:
             v -= self.lr * grad
         param += v
 
     def update_one_gpu(self, param, grad, v):
-        if self.cplx:
+        #import pdb; pdb.set_trace()
+        cplx = grad.dtype == numpy.complex64
+        ctype = 'pycuda::complex<float>' if cplx else 'float'
+        if cplx:
             cuda.elementwise(
                 '''{ctype}* param, const {ctype}* grad, {ctype}* v,
-                   float lr, float momentum'''.format(ctype=self.ctype),
+                   float lr, float momentum'''.format(ctype=ctype),
                 '''v[i] = momentum * v[i] - lr * conj(grad[i]);
                    param[i] += v[i];''',
                 'momentum_sgd')(param, grad, v, self.lr, self.momentum)
-            # Use this form if teh conjugate gradient is used (see linear)
+            # Use this form if the conjugate gradient is used (see linear)
             # cuda.elementwise(
             #     '''{ctype}* param, const {ctype}* grad, {ctype}* v,
             #        float lr, float momentum'''.format(ctype=self.ctype),
@@ -55,7 +53,7 @@ class MomentumSGD(optimizer.Optimizer):
         else:
             cuda.elementwise(
                 '''{ctype}* param, const {ctype}* grad, {ctype}* v,
-                   float lr, float momentum'''.format(ctype=self.ctype),
+                   float lr, float momentum'''.format(ctype=ctype),
                 '''v[i] = momentum * v[i] - lr * grad[i];
                    param[i] += v[i];''',
                 'momentum_sgd')(param, grad, v, self.lr, self.momentum)
