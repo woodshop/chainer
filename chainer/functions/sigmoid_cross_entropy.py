@@ -3,6 +3,7 @@ import numpy
 from chainer import cuda
 from chainer import function
 from chainer.functions import sigmoid
+from chainer.functions.sigmoid import Sigmoid
 from chainer.utils import type_check
 
 
@@ -33,19 +34,19 @@ class SigmoidCrossEntropy(function.Function):
 
     def forward_gpu(self, inputs):
         x, t = inputs
-        self.y, = sigmoid.Sigmoid(self.use_cudnn).forward_gpu((x,))
+        self.y, = Sigmoid(self.use_cudnn).forward_gpu((x,))
         loss = -cuda.reduce(
             'int* t, float* x',
             'x[i] * (t[i] - (x[i] >= 0)) - log1pf(expf(-fabsf(x[i])))',
             'a+b', '0', 'sigmoid_crossent_fwd', numpy.float32)(t, x)
         return loss / t.shape[0],
 
-    def backward_cpu(self, inputs, grad_outputs):
+    def backward_cpu(self, inputs, grad_outputs, cgy):
         t, gloss = inputs[1], grad_outputs[0]
         gx = gloss * (self.y - t.astype(self.y.dtype)) / t.shape[0]
-        return gx, None
+        return (gx, None), (None, None)
 
-    def backward_gpu(self, inputs, grad_outputs):
+    def backward_gpu(self, inputs, grad_outputs, cgy):
         t, gloss = inputs[1], grad_outputs[0]
         gx = cuda.empty_like(self.y)
         coeff = gloss / t.shape[0]
@@ -53,7 +54,7 @@ class SigmoidCrossEntropy(function.Function):
             'float* gx, const float* y, const int* t, const float* coeff',
             'gx[i] = *coeff * (y[i] - t[i])',
             'sigmoid_crossent_bwd')(gx, self.y, t, coeff)
-        return gx, None
+        return (gx, None), (None, None)
 
 
 def sigmoid_cross_entropy(x, t, use_cudnn=True):
