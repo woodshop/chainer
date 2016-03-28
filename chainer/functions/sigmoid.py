@@ -19,15 +19,24 @@ class Sigmoid(function.Function):
 
     def check_type_forward(self, in_types):
         type_check.expect(in_types.size() == 1)
-        type_check.expect(in_types[0].dtype == numpy.float32)
+        type_check.expect(in_types[0].dtype == self.dtype)
 
     def forward_cpu(self, x):
         self.y = 1 / (1 + numpy.exp(-x[0]))
         return self.y,
 
     def forward_gpu(self, x):
+        if not hasattr(self, 'cplx'):
+            self.cplx = x[0].dtype == numpy.complex64
+            if self.cplx:
+                self.dtype = numpy.complex64
+                self.dtype = 'pycuda::complex<float>'
+            else:
+                self.dtype = numpy.float32
+                self.ctype = 'float'
+
         self.y = cuda.empty_like(x[0])
-        if cudnn.enabled and self.use_cudnn:
+        if False and cudnn.enabled and self.use_cudnn:
             handle = cudnn.get_default_handle()
             desc = cudnn.get_tensor_desc(x[0], 1, 1)
             libcudnn.cudnnActivationForward(
@@ -35,16 +44,22 @@ class Sigmoid(function.Function):
                 0, desc.value, cudnn.get_ptr(self.y))
         else:
             cuda.elementwise(
-                'float* y, const float* x', 'y[i] = 1 / (1 + __expf(-x[i]))',
+                '{ctype}* y, const {ctype}* x'.format(ctype=self.ctype), 
+                'y[i] = float(1) / (float(1) + exp(-x[i]))',
                 'sigmoid_fwd')(self.y, x[0])
         return self.y,
 
-    def backward_cpu(self, x, gy):
-        return gy[0] * self.y * (1 - self.y),
+    def backward_cpu(self, x, gy, cgy):
+        gx = gy[0] * self.y * (1 - self.y)
+        if self.cplx:
+            cgx = cgy[0] * numpy.conj(gx)
+        else:
+            cgx = None
+        return (gx,), (cgx,)
 
-    def backward_gpu(self, x, gy):
+    def backward_gpu(self, x, gy, cgy):
         gx = cuda.empty_like(x[0])
-        if cudnn.enabled and self.use_cudnn:
+        if False and cudnn.enabled and self.use_cudnn:
             handle = cudnn.get_default_handle()
             desc = cudnn.get_tensor_desc(self.y, 1, 1)
             libcudnn.cudnnActivationBackward(
@@ -54,10 +69,17 @@ class Sigmoid(function.Function):
                 0, desc.value, cudnn.get_ptr(gx))
         else:
             cuda.elementwise(
-                'float* gx, const float* y, const float* gy',
-                'gx[i] = gy[i] * y[i] * (1 - y[i])',
+                '''
+                   {ctype}* gx, const {ctype}* y, 
+                   const {ctype}* gy
+                '''.format(ctype=self.ctype),
+                'gx[i] = gy[i] * y[i] * (float(1) - y[i])',
                 'sigmoid_bwd')(gx, self.y, gy[0])
-        return gx,
+        if self.cplx:
+            cgx = cgy[0] * gx.conj()
+        else:
+            cgx = None
+        return (gx,), (cgx,)
 
 
 def sigmoid(x, use_cudnn=True):
