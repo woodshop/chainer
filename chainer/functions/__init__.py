@@ -47,6 +47,9 @@ from chainer.functions import arcsin
 from chainer.functions import arcsinh
 from chainer.functions import arccos
 from chainer.functions import georgiou
+from chainer.functions import project_complex_to_real
+from chainer.functions import split_complex_to_real
+from chainer.functions import real
 
 NonparameterizedConvolution2D = \
     nonparameterized_convolution_2d.NonparameterizedConvolution2D
@@ -111,6 +114,9 @@ NegativeSampling = negative_sampling.NegativeSampling
 Parameter = parameter.Parameter
 PReLU = prelu.PReLU
 Bilinear = bilinear.Bilinear
+ProjectComplexToReal = project_complex_to_real.ProjectComplexToReal
+SplitComplexToReal = split_complex_to_real.SplitComplexToReal
+Real = real.Real
 
 convolution_2d = nonparameterized_convolution_2d.convolution_2d
 linear = nonparameterized_linear.linear
@@ -161,3 +167,6 @@ mean_squared_error = mean_squared_error.mean_squared_error
 sigmoid_cross_entropy = sigmoid_cross_entropy.sigmoid_cross_entropy
 softmax_cross_entropy = softmax_cross_entropy.softmax_cross_entropy
 sum = sum_.sum
+project_complex_to_real = project_complex_to_real.project_complex_to_real
+split_complex_to_real = split_complex_to_real.split_complex_to_real
+real = real.real
