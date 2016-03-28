@@ -10,9 +10,9 @@ from chainer import cuda
 def _sqnorm(x, dtype):
     if isinstance(x, cuda.GPUArray):
         with cuda.using_device(x):
-            return dtype(cuda.gpuarray.dot(x, x).get())
+            return dtype(cuda.gpuarray.dot(x, x.conj()).get().real)
     x = x.ravel()
-    return dtype(x.dot(x))
+    return dtype(x.dot(x.conj()).real)
 
 
 class Optimizer(object):
@@ -150,8 +150,9 @@ class Optimizer(object):
         """
         # TODO(beam2d): Make it asynchronous to CPU when gradients exist on GPU
         sqnorm = 0
+        #import pdb; pdb.set_trace()
         for _, g, _ in self.tuples:
-            sqnorm += _sqnorm(g, self.dtype)
+            sqnorm += _sqnorm(g, numpy.float32)
         return numpy.sqrt(sqnorm)
 
     def clip_grads(self, maxnorm):
@@ -166,7 +167,10 @@ class Optimizer(object):
                 It uses this method to compute the gradient norm to be clipped.
 
         """
+        #import pdb; pdb.set_trace()
         norm = self.compute_grads_norm()
+        if self.debug:
+            print("\tGRAD NORM: {}".format(norm))
         if norm > maxnorm:
             ratio = maxnorm / norm
             for _, g, _ in self.tuples:
