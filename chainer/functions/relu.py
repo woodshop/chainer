@@ -45,10 +45,10 @@ class ReLU(function.Function):
                 'relu_fwd')(y, x[0])
         return y,
 
-    def backward_cpu(self, x, gy):
-        return utils.force_array(gy[0] * (x[0] > 0)),
+    def backward_cpu(self, x, gy, cgy):
+        return (utils.force_array(gy[0] * (x[0] > 0)),), (None,)
 
-    def backward_gpu(self, x, gy):
+    def backward_gpu(self, x, gy, cgy):
         gx = cuda.empty_like(x[0])
         if cudnn.enabled and self.use_cudnn:
             handle = cudnn.get_default_handle()
@@ -63,7 +63,7 @@ class ReLU(function.Function):
                 'float* gx, const float* x, const float* gy',
                 'gx[i] = x[i] > 0 ? gy[i] : 0',
                 'relu_bwd')(gx, x[0], gy[0])
-        return gx,
+        return (gx,),(None,)
 
 
 def relu(x, use_cudnn=True):
