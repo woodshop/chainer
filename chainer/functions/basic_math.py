@@ -548,8 +548,14 @@ class Exp(function.Function):
         self.y = cuda.cumath.exp(x[0])
         return self.y,
 
-    def backward(self, x, gy):
-        return utils.force_array(self.y * gy[0]),
+    def backward(self, x, gy, cgy):
+        gx = utils.force_array(self.y * gy[0])
+        if self.cplx:
+            cgx = utils.force_array(self.y.conj() * cgy[0])
+        else:
+            cgx = None
+        return (gx,),(cgx,)
+                
 
 
 def exp(x):
