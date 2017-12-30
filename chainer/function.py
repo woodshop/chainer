@@ -328,7 +328,7 @@ class Function(object):
         """
         return (tuple(None for _ in inputs), tuple(None for _ in inputs))
 
-    def backward_gpu(self, inputs, grad_outputs, conj_grad_inputs):
+    def backward_gpu(self, inputs, grad_outputs, conj_grad_outputs):
         """Applies backprop to output gradient arrays on GPU.
 
         Args:
